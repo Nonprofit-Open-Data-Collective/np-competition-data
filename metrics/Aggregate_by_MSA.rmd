@@ -1,0 +1,185 @@
+---
+title: "Aggregate_by_MSA"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=F, message=F)
+```
+
+
+
+```{r}
+
+library( dplyr )
+library( pander )
+
+setwd( "C:/Users/jlecy/Dropbox/04 - PAPERS/01 - In Progress/16 - NP Competition in Changing Markets/Practice With MSA Files" )
+```
+
+
+
+
+## Crosswalk FIPS to MSA
+
+```{r}
+
+### Load Crosswalk
+
+msa.fips <- read.csv( "2010 MSA CountyFIPS Crosswalk.csv", stringsAsFactors=F )
+
+head( msa.fips ) %>% pander
+
+# names(msa.fips) "CBSAFP" "FIPS" "COUNTY.NAME" "MSA.NAME" "STATE.FIP"
+
+msa.names <- unique( msa.fips[ , c("CBSAFP","MSA.NAME") ] )
+
+
+head( msa.names ) %>% pander
+```
+
+
+```{r}
+
+
+### Load NCCS Core Data from 2000
+
+# core.2000 <- read.csv( "http://nccs-data.urban.org/data/core/2010/nccs.core2010pc.csv", stringsAsFactors=F )
+
+# Or download and read from local file
+
+# core.2000 <- read.csv( "nccs.core2010pc.csv", stringsAsFactors=F )
+
+# saveRDS( core.2000, "nccs.core2010pc.rds" )
+
+core.2000 <- readRDS( "nccs.core2010pc.rds" )
+
+
+names( core.2000 ) <- toupper( names( core.2000 ))
+
+
+core <- select( core.2000,  EIN, FIPS, PMSA, CITY, ZIP5, LATITUDE, LONGITUDE,
+                            NTMAJ5, NTMAJ10, NTMAJ12,
+                            CONT, PROGREV, TOTREV2, TOTREV, EXPS, ASS_EOY, 
+                            RULEDATE, LEVEL1, LEVEL2, LEVEL3, LEVEL4  )
+
+head( core ) %>% pander
+
+# If need to translate from factor to numeric 
+# core$FIPS <- as.numeric(as.character(core$FIPS) )
+
+
+
+### Merge Core File with MSA Codes
+
+core$FIPS <- as.integer( core$FIPS )
+
+core <- merge( core, msa.fips, by.x="FIPS", by.y="FIPS", all.x=T )
+
+# msa.factor <- factor( core$CBSAFP )
+
+msa.factor <- factor( core$MSA.NAME )
+
+core$msa.factor <- msa.factor
+
+
+### Sum Stats by MSA
+
+num.npos.2000 <- tapply( core$EIN, msa.factor, length  )
+
+total.pub.sup.2000 <- tapply( core$CONT, msa.factor, sum, na.rm=T )
+
+total.prog.rev.2000 <- tapply( core$PROGREV, msa.factor, sum, na.rm=T )
+
+total.rev.2000 <- tapply( core$TOTREV, msa.factor, sum, na.rm=T )
+
+total.assets.2000 <- tapply( core$ASS_EOY, msa.factor, sum, na.rm=T )
+
+dat.2000 <- data.frame( msa=names(num.npos.2000), num.npos.2000, total.pub.sup.2000, 
+                            total.prog.rev.2000, total.rev.2000, total.assets.2000 ) 
+
+
+
+### Clean-Up
+
+row.names( dat.2000 ) <- NULL
+
+rm( num.npos.2000 )
+rm( total.pub.sup.2000 )
+rm( total.prog.rev.2000 )
+rm( total.rev.2000 )
+rm( total.assets.2000 )
+rm( msa.factor )
+
+```
+
+## Example Two Factors in Core R
+
+```{r}
+
+num.npos.2000 <- tapply( core$EIN, INDEX=list(core$msa.factor,core$NTMAJ12), length  )
+
+total.pub.sup.2000 <- tapply( core$CONT, INDEX=list(core$msa.factor,core$NTMAJ12), sum, na.rm=T )
+
+head( num.npos.2000 ) %>% pander()
+
+```
+
+
+
+
+
+## dplyr Version
+
+
+```{r}
+
+
+dat.2000.dplyr <- 
+core %>% group_by( msa.factor, NTMAJ12 ) %>% summarize( num.npos.2000=n(),
+                                               total.pub.sup.2000=sum(CONT),
+                                               total.rev.2000=sum(TOTREV) )
+
+head( dat.2000.dplyr ) %>% pander
+
+```
+
+
+# HHI Calculations
+
+```{r}
+
+core %>% group_by( msa.factor, NTMAJ12 ) %>% summarize( hhi= sum( (TOTREV / sum(TOTREV))^2 ) )
+
+```
+
+## Manual Check 
+
+```{r}
+
+these <- core$msa.factor == "Abilene, TX" & core$NTMAJ12 == "AR"
+these[ is.na(these) ] <- FALSE
+abilene.arts <- core[ these , ]
+
+nrow( abilene.arts )
+
+head( abilene.arts ) %>% pander
+
+tot.rev <- sum( abilene.arts$TOTREV )
+
+rev.prop.total <- abilene.arts$TOTREV / tot.rev 
+
+rev.squared <- rev.prop.total^2
+
+hhi <- sum( rev.squared )
+
+hhi
+
+```
+
+
+## Adjusted HHI
+
+![](adj_hhi.svg)
+
+From [Wikipedia](https://en.wikipedia.org/wiki/Herfindahl_index).

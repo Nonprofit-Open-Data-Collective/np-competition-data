@@ -1,0 +1,460 @@
+---
+title: "Metric 01 - HHI"
+output:
+  html_document:
+    theme: readable
+    df_print: paged
+    highlight: tango
+    toc: yes
+    toc_float: no
+    css: html/simple.css
+    includes:
+      after_body: html/footer.html
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=F, warning=F, fig.width = 10)
+```
+
+
+
+
+
+
+
+# Herfindahl-Hirschman Index
+
+
+
+## Definitions
+
+Herfindahl-Hirschman Index (HHI) is one of the most popular measures of market structure in nonprofit research and economics. Specifically, it is a measure of market concentration that is used to understand market competitiveness and organizations?? competitive behavior and performance in markets.
+
+## Metric Calculations
+
+HHI can be calculated as follows: 
+
+**Approach 1:**
+
+The index could be calculated as the sum of the squared market share of each firm competing in a market (Thornton & Belski, 2010). In the nonprofit sector, market share is determined by the ratio of a nonprofit??s total revenue to the aggregate revenue for the organization's market. The calculated values range from 1/N to 1, where N is the number of organizations in a market. A market with an HHI of 1 is considered as a monopoly. In contrast, a market with an HHI close to 0 would be viewed as a nearly competition one.
+
+$$H =\sum_{i=1}^N s_i^2$$
+
+*where $s_i$ is the market share of firm i in the market, and N is the number of firms.* 
+
+*Thus, in a market with two firms that each have 50 percent market share, the Herfindahl index equals 0.502+0.502 = 1/2.* [wikipedia](https://en.wikipedia.org/wiki/Herfindahl%E2%80%93Hirschman_Index)
+
+
+**Approach 2:**
+
+Another approach to calculate HHI used the same definition of market share as Approach 1; however, the market share of each organization is expressed as a whole number rather then a decimal in the calculation (Seaman, Wilsker, & Young, 2014; Soule & King, 2008; Thornoton, 2006; Castaneda, Garen, & Thornton, 2008). For example, we take the value of 40 to calculate HHI if a nonprofit??s market share is 0.4 (40%). The calculated values range from 1/N to 10,000. A market with an HHI of 10,000 is considered as a monopoly. In contrast, a market with an HHI close to 0 would be viewed as a nearly competition one. The U.S. Department of Justice suggests that a market with an HHI less than 1,500 to be an unconcentrated marketplace, an HHI of 1,500 to 2,500 to be a moderately concentrated marketplace, and an HHI greater than 2,500 to be a highly concentrated marketplace. There is only scale difference Approach 1 and 2.
+
+**Approach 3:**
+
+Normalized HHI ranges between 0 to 1, rather than 1/N to 1 or 1/N to 10,000.
+
+## Notes
+
+We define a market as a Metropolitan Statistical Area (MSA) in which relevant nonprofits compete for resources to survive. The code to create HHI metrics is as follows.
+
+
+# Packages
+
+```{r}
+
+library( haven )        # importing data files 
+library( tidyr )        # data wrangling
+library( dplyr )        # data wrangling 
+library( ggplot2 )      # fancy plots 
+library( ggthemes )     # fancy plots
+library( scales )       # re-scaling numbers
+library( stargazer )    # nice tables 
+library( pander )       # format tables for HTML 
+library( DT )           # embed datasets in HTML docs
+
+source( "r-helper-functions/helper-functions.R" )
+```
+
+
+```{r, echo=F}
+# stargazer table print type
+# run chunk for live RMD sessions
+s.type <- "text"
+```
+
+
+```{r, echo=F}
+# stargazer table print type
+# resets to html when knitting
+s.type <- "html"
+```
+
+# Data
+
+```{r, cache=TRUE}
+core.2010 <- readRDS( "Data/nccs.core2010pc.rds" )
+
+names( core.2010 ) <- toupper( names( core.2010 ))
+
+core <- select( core.2010, EIN, MSA_NECH, NTMAJ12, TOTREV, CONT )
+
+core$NTMAJ12[ core$NTMAJ12 == "AR" ] <- "Arts"
+core$NTMAJ12[ core$NTMAJ12 == "BH" ] <- "Universities"
+core$NTMAJ12[ core$NTMAJ12 == "ED" ] <- "Education"
+core$NTMAJ12[ core$NTMAJ12 == "EH" ] <- "Hospitals"
+core$NTMAJ12[ core$NTMAJ12 == "EN" ] <- "Environmental"
+core$NTMAJ12[ core$NTMAJ12 == "HE" ] <- "Health"
+core$NTMAJ12[ core$NTMAJ12 == "HU" ] <- "Human Services"
+core$NTMAJ12[ core$NTMAJ12 == "IN" ] <- "International"
+core$NTMAJ12[ core$NTMAJ12 == "MU" ] <- "Mutual Benefit"
+core$NTMAJ12[ core$NTMAJ12 == "PU" ] <- "Public Benefit"
+core$NTMAJ12[ core$NTMAJ12 == "RE" ] <- "Religion"
+core$NTMAJ12[ core$NTMAJ12 == "UN" ] <- "Unknown"
+
+core$NTMAJ12 <- factor( core$NTMAJ12 )
+
+head(core) %>% pander()
+```
+
+
+Recode negative revenues as zero because they cause HHIs above 1:
+
+```{r}
+core$TOTREV3 <- core$TOTREV
+core$TOTREV[ core$TOTREV < 0 ] <- 0
+```
+
+
+```{r}
+msa.pop <- read.csv("Data/msa-pop.csv")
+```
+
+
+
+# Create Competition Metrics
+
+
+## Regular HHI
+
+```{r, eval=T}
+dat.hhi <- 
+  core %>% 
+  group_by( MSA_NECH, NTMAJ12 ) %>% 
+  summarize( hhi= sum( (TOTREV / sum(TOTREV))^2 ), 
+             n=n(), 
+             revenue= sum(TOTREV), 
+             contribution=sum(CONT) )
+
+dat.hhi$hhi[ dat.hhi$hhi > 1 ] <- 1
+
+dat.hhi$revenue[ dat.hhi$revenue < 0 ] <- 0
+
+dat.hhi <- merge( dat.hhi, msa.pop, all.x=T )
+```
+
+
+```{r, results="asis"}
+dat.hhi %>%
+  # rescale for printing
+  mutate( hhi = 100 * hhi,
+          revenue_thousands = revenue / 1000, 
+          contributions_thousands = contribution / 1000 ) %>%  
+  select( hhi, n, revenue_thousands, contributions_thousands, MSA_POP ) %>%
+stargazer( type = s.type, 
+           digits=0, 
+           summary.stat = c("min","p25","median","mean","p75","max", "sd"))
+```
+
+
+
+
+## Normalized HHI
+
+```{r}
+# There is a clarification called TOTREV2 on the list. 
+# What is the difference between TOTREV and TOTREV2?  
+# CONT represents total contributions.
+
+
+dat.nhhi <-
+  core %>% 
+  group_by( MSA_NECH, NTMAJ12 ) %>% 
+  summarize( 
+    nhhi= sum((((TOTREV / sum(TOTREV))^2) - 
+                 (1 / EIN)) / (1 -(1 / EIN))), 
+    n=n(), revenue= sum(TOTREV))
+
+
+dat.nhhi$nhhi[ dat.nhhi$nhhi > 1 ] <- 1
+
+dat.nhhi$revenue[ dat.nhhi$revenue < 0 ] <- 0
+```
+
+```{r, results="asis"}
+stargazer( as.data.frame(dat.nhhi), type=s.type )
+```
+
+```{r}
+dat.nhhi %>%
+  group_by( NTMAJ12 ) %>%
+  summarize( n=n(), min=min(nhhi), max=max(nhhi) ) %>% 
+  pander()
+```
+
+
+
+
+### Data Download 
+
+```{r, fig.height=10}
+# library( DT )
+
+these.buttons <- c( 'copy', 'csv', 'excel', 'print' )
+
+datatable( dat.nhhi,
+           filter='bottom', rownames=FALSE, 
+           #options=list( pageLength=5, autoWidth=TRUE ),
+           fillContainer=TRUE, 
+           style="bootstrap",
+           class='table-condensed table-striped',
+           extensions = 'Buttons', 
+           options=list( dom='Bfrtip', 
+                         buttons=these.buttons  )) %>%
+  
+formatStyle( "MSA_NECH", "white-space"="nowrap" )
+```
+
+
+
+# Descriptive Statistics
+
+
+## HHI by MSAs
+
+```{r}
+dat.msa <-
+  core %>%
+  group_by(MSA_NECH) %>%
+  summarize( hhi= sum( ( TOTREV / sum(TOTREV) )^2 ), 
+             n=n(), 
+             revenue= sum(TOTREV) ) 
+
+# dat.msa$hhi[ dat.msa$hhi > 1 ] <- 1
+
+# dat.msa$revenue[ dat.msa$revenue < 0 ] <- 0
+
+summary( dat.msa ) %>% pander()
+
+
+ggplot( dat.msa, aes(x = hhi )) +  
+  geom_density( alpha = 0.5, fill="blue" ) + 
+  xlim( 0, 1 ) 
+```
+
+
+
+## HHI by MSA Population
+
+```{r}
+# msa.pop <- read.csv("Data/MSA_POP.csv")
+# msa.names <- read.csv("Data/msa-names.csv")
+# msa.pop <- merge( msa.pop, msa.names, all.x=TRUE )
+
+dat.msa <- merge( dat.msa, msa.pop, by="MSA_NECH", all.x=T )
+
+jplot( log10(dat.msa$MSA_POP), 
+       dat.msa$hhi, xaxt="n",
+       xlab="MSA Population", ylab="HHI"  )
+axis( side=1, 
+      at=c(0,1,2,3,4), 
+      labels=c("1","10","100","1,000","10,000") )
+
+
+
+ggplot( dat.msa, aes(log10(MSA_POP),hhi) )  + 
+        geom_point( col="gray30", alpha=0.7) + 
+        xlab( "MSA Population (logged)" ) + 
+        ylab( "HHI Across MSAs" ) +
+        theme_minimal()
+```
+
+
+## HHI by Subsector
+
+```{r}
+
+dat.sub <-
+  core %>%
+  group_by(NTMAJ12) %>%
+  summarize( hhi= round( sum( (TOTREV / sum(TOTREV))^2 ), 3 ), 
+             revenue= sum(TOTREV) ) %>%
+  arrange( - hhi )  %>% pander( )
+
+summary(dat.sub)
+
+ggplot( dat.hhi, aes(x = hhi)) +  
+  geom_density( alpha = 0.5, fill="blue" ) + 
+  xlim( -0.05, 1 ) +
+  xlab( "HHI" )
+
+
+ggplot( dat.hhi, aes( x=hhi ) ) + 
+  geom_density( alpha = 0.5, fill="blue" ) + 
+  xlim( -0.05, 1 ) +
+  xlab( "HHI" ) + facet_wrap( ~ NTMAJ12, nrow=3 ) + 
+  theme_minimal()
+
+ggplot( dat.hhi, aes(y = hhi) )  + 
+  geom_boxplot( col="gray30", alpha=0.7) + 
+  ylab( "HHI Across MSAs" ) +
+  facet_wrap( ~ NTMAJ12, nrow=3 ) + 
+  theme_minimal()
+
+```
+
+
+
+
+## HHI and Subsector Size
+
+```{r}
+
+jplot( log10(dat.hhi$n), dat.hhi$hhi, xaxt="n",
+       xlab="Number of Nonprofits", ylab="HHI",  )
+axis( side=1, 
+      at=c(0,1,2,3,4), 
+      labels=c("1","10","100","1,000","10,000") )
+
+
+
+ggplot( dat.hhi, aes(log10(n),hhi) )  + 
+  geom_point( col="gray30", alpha=0.7) + 
+  xlab( "Number of Nonprofits (logged)" ) + 
+  ylab( "HHI Across MSAs" ) +
+  theme_minimal()
+
+
+ggplot( dat.hhi, aes(log10(n),hhi) )  + 
+  geom_point( col="gray30", alpha=0.7) + 
+  xlab( "Number of Nonprofits (logged)" ) + 
+  ylab( "HHI Across MSAs" ) +
+  facet_wrap( ~ NTMAJ12, nrow=3 ) + 
+  theme_minimal()
+
+```
+
+## HHI and Total Revenue
+
+
+```{r}
+
+jplot( log10(dat.hhi$revenue), dat.hhi$hhi, xaxt="n",
+       xlab="Total Revenue (logged)", ylab="HHI"  )
+axis( side=1, 
+      at=c(0,1,2,3,4,5,6,7,8,9,10,11), 
+      labels=c("1","10","100","1K","10K","100K",
+               "1M","10M","100M","1B","10B","100B") )
+
+
+
+
+ggplot( dat.hhi, aes(log10(revenue),hhi) )  + 
+  geom_point( col="gray30", alpha=0.7) +
+  xlab( "Total Revenue (logged)" ) + 
+  ylab( "HHI Across MSAs" ) +
+  theme_minimal()
+
+
+ggplot( dat.hhi, aes(log10(revenue),hhi) )  + 
+  geom_point( col="gray30", alpha=0.7) +
+  xlab( "Total Revenue (logged)" ) + 
+  ylab( "HHI Across MSAs" ) +
+  facet_wrap( ~ NTMAJ12, nrow=3 ) + 
+  theme_minimal()
+
+
+
+ggplot( dat.hhi, aes(log10(revenue),hhi) )  + 
+  geom_point( col="gray30", alpha=0.7) + 
+  geom_smooth(method="lm") + 
+  xlab( "Total Revenue (logged)" ) + ylab( "HHI Across MSAs" ) +
+  facet_wrap( ~ NTMAJ12, nrow=3 ) + 
+  theme_minimal()
+
+```
+
+
+## HHI and Subsector Contribution
+
+
+```{r}
+
+jplot( log10(dat.hhi$contribution), dat.hhi$hhi, 
+       xlab="Contribution (logged)", ylab="HHI", 
+       xaxt="n" ) 
+axis( side=1, 
+      at=c(0,1,2,3,4,5,6,7,8,9,10,11), 
+      labels=c("1","10","100","1K","10K","100K",
+               "1M","10M","100M","1B","10B","100B") )
+
+
+ggplot( dat.hhi, aes(log10(contribution),hhi) )  + 
+  geom_point( col="gray30", alpha=0.7) +
+  xlab( "Contrubution (logged)" ) + 
+  ylab( "HHI Across MSAs" ) +
+  theme_minimal()
+
+
+ggplot( dat.hhi, aes(log10(contribution),hhi) )  +
+  geom_point( col="gray30", alpha=0.7) +
+  xlab( "Contrubution (logged)" ) + 
+  ylab( "HHI Across MSAs" ) +
+  facet_wrap( ~ NTMAJ12, nrow=3 ) + 
+  theme_minimal()
+
+
+ggplot( dat.hhi, aes(log10(contribution),hhi) )  + 
+  geom_point( col="gray30", alpha=0.7) +
+  geom_smooth(method="lm") + 
+  xlab( "Contrubution (logged)" ) + 
+  ylab( "HHI Across MSAs" ) +
+  facet_wrap( ~ NTMAJ12, nrow=3 ) + 
+  theme_minimal()
+```
+
+
+
+# Reference
+
+
+
+Seaman, B., A. Wilsker, and D. R. Young. 2014. ????Measuring Concentration and Competition in the U.S. Nonprofit Sector: Implications for Research and Public Policy.???? Nonprofit Policy Forum 5(2): 231?V259.
+
+Thornoton, J. 2006. ????Nonprofit Fund-Raising in Competitive Donor Markets.???? Nonprofit and Voluntary Sector Quarterly 35: 204?V224.
+
+Soule, S. A., & King, B. G. (2008). Competition and resource partitioning in three social movement industries. American Journal of Sociology, 113(6), 1568-1610.
+
+Castaneda, M. A., Garen, J., & Thornton, J. (2007). Competition, contractibility, and the market for donors to nonprofits. The Journal of Law, Economics, & Organization, 24(1), 215-246.
+
+Thornton, J. P., & Belski, W. H. (2010). Financial reporting quality and price competition among nonprofit firms. Applied economics, 42(21), 2699-2713.
+
+Mendoza-Abarca, K. I., & Gras, D. (2017). The Performance Effects of Pursuing a Diversification Strategy by Newly Founded Nonprofit Organizations. Journal of Management, 0149206316685854.
+
+
+
+<br>
+<br>
+<hr>
+<br>
+<br>
+
+
+
+
+```{css, echo=F}
+
+div#TOC{ margin-top: 42px; }
+```
+

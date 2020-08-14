@@ -1,0 +1,356 @@
+---
+title: "Markdown Template"
+output:
+  html_document:
+    code_folding: show
+    df_print: paged
+    highlight: haddock
+    theme: cerulean
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=F, warning=F, fig.width = 10)
+```
+
+
+# Load Packages
+
+```{r}
+
+library( haven )
+library( tidyr )
+library( dplyr )
+library( ggplot2 )
+library( ggthemes )
+library( scales )
+library( stargazer )
+library( pander )
+
+
+```
+
+## Custom Functions
+
+```{r}
+
+jplot <- function( x1, x2, draw.line=T, ... )
+{
+
+	plot( x1, x2,
+	      pch=19, 
+	      col=gray(0.6, alpha = 0.4), 
+	      cex=0.8,  
+	      bty = "n",
+	      cex.lab=1.5,
+        ... )
+
+	if( draw.line==T ){ 
+		ok <- is.finite(x1) & is.finite(x2)
+		lines( lowess(x2[ok]~x1[ok]), col="red", lwd=3 ) }
+
+}
+
+```
+
+
+
+# The Concentration of Commercial Nonprofitd Index
+
+
+
+## Definitions
+
+
+
+## Calculations
+
+
+
+Approach 1:
+
+
+
+Approach 2:
+
+
+
+Approach 3:
+
+
+
+## Notes
+
+We define a market as a Metropolitan Statistical Area (MSA) in which relevant nonprofits compete for resources to survive. The code to create the metrics is as follows.
+
+
+# Create Metrics
+
+```{r, eval=T}
+
+
+
+# setwd("C:/Users/JK/Desktop/R Practice")
+
+# core.2010 <- readRDS( "nccs.core2010pc.rds" )
+
+core.2010 <- readRDS(gzcon(url("https://www.dropbox.com/s/byt7kh3kejg4ycl/nccs.core2010pc.rds?dl=1")))
+
+pop <- read.csv( "https://www.dropbox.com/s/k0b8o17k03ffio0/MSA.Population.2010.csv?dl=1", stringsAsFactors=F )
+
+
+names( core.2010 ) <- toupper( names( core.2010 ))
+
+core <- select( core.2010, EIN, MSA_NECH, NTMAJ12, TOTREV, PROGREV, DUES, INVINC, SAVINT, SECINC, NETRENT, OTHINVST, SALESECN, SALEOTHN, GRPROF)
+
+
+######
+# PROGREV Program Service Revenue
+# DUES    Dues
+# INVINC  Total Investment Income
+# SAVINT  Interest Revenue
+# SECINC  Dividends
+# NETRENT Net Rental Income
+# OTHINVST Other Investment Income
+# SALESECN Net Gain/Loss: Sale of Securities
+# SALEOTHN Net Gain/Loss: Sale of Other Assets
+# GRPROF   Inventory Gross Profit
+
+core$NTMAJ12[ core$NTMAJ12 == "AR" ] <- "Arts"
+core$NTMAJ12[ core$NTMAJ12 == "BH" ] <- "Universities"
+core$NTMAJ12[ core$NTMAJ12 == "ED" ] <- "Education"
+core$NTMAJ12[ core$NTMAJ12 == "EH" ] <- "Hospitals"
+core$NTMAJ12[ core$NTMAJ12 == "EN" ] <- "Environmental"
+core$NTMAJ12[ core$NTMAJ12 == "HE" ] <- "Health"
+core$NTMAJ12[ core$NTMAJ12 == "HU" ] <- "Human Services"
+core$NTMAJ12[ core$NTMAJ12 == "IN" ] <- "International"
+core$NTMAJ12[ core$NTMAJ12 == "MU" ] <- "Mutual Benefit"
+core$NTMAJ12[ core$NTMAJ12 == "PU" ] <- "Public Benefit"
+core$NTMAJ12[ core$NTMAJ12 == "RE" ] <- "Religion"
+core$NTMAJ12[ core$NTMAJ12 == "UN" ] <- "Unknown"
+
+head(core) %>% pander()
+             
+
+core$NTMAJ12 <- factor( core$NTMAJ12 )
+
+
+core$commercialrevenues = core$PROGREV + core$DUES + core$INVINC + core$SAVINT + core$SECINC + core$NETRENT + core$OTHINVST + core$SALESECN + core$SALEOTHN + core$GRPROF
+
+core$commercialpercent = core$commercialrevenues/core$TOTREV*100
+
+dat.commercial <- 
+  core %>% 
+  group_by( MSA_NECH) %>% 
+  summarize(n=n(), revenue = sum(TOTREV), n_commercial=sum(commercialpercent > 50), 
+            concentration=n_commercial/n*100 )
+
+# View(dat.commercial)
+
+
+
+dat.commercial.sub <- 
+  core %>% 
+  group_by( MSA_NECH, NTMAJ12) %>% 
+  summarize(n=n(), revenue = sum(TOTREV), n_commercial=sum(commercialpercent > 50), 
+            concentration=n_commercial/n*100 )
+
+# View(dat.commercial.sub)
+
+```
+
+# Descriptive Statistics
+
+## Big nonprofits by MSAs and MSAs/Sub
+
+```{r}
+
+dat.commercial <- 
+  core %>% 
+  group_by( MSA_NECH) %>% 
+  summarize(n=n(), revenue = sum(TOTREV), n_commercial=sum(commercialpercent > 50), 
+            concentration=n_commercial/n*100 )
+
+ggplot( dat.commercial, aes(x=concentration)) +  geom_histogram()
+
+ggplot( dat.commercial, aes(x=n_commercial)) +  geom_bar()
+
+ggplot(dat.commercial, aes(x=concentration)) +  geom_density( alpha = 0.5, fill="blue" ) + xlim( 0, 100 )
+
+
+dat.msa.sub <-
+  core %>%
+  group_by(MSA_NECH,NTMAJ12) %>%
+  summarize(n=n(), revenue = sum(TOTREV), n_commercial=sum(commercialpercent > 50), 
+            concentration=n_commercial/n*100 )
+
+ggplot( dat.msa.sub, aes(x=concentration)) +  geom_histogram()
+
+ggplot( dat.msa.sub, aes(x=n_commercial)) +  geom_bar() + xlim( 0, 1000 )
+
+
+ggplot(dat.msa.sub, aes(x=concentration)) +  geom_density( alpha = 0.5, fill="blue" ) + xlim( 0, 100 )
+
+
+```
+
+## Commercial organization by Subsector
+
+```{r}
+
+dat.sub <-
+          core %>%
+          group_by(NTMAJ12) %>%
+          summarize(n=n(), revenue = sum(TOTREV), n_commercial=sum(commercialpercent > 50), 
+            concentration=n_commercial/n*100 ) 
+
+summary(core$TOTREV)
+
+dat.commercial.sub <- 
+  core %>% 
+  group_by( MSA_NECH, NTMAJ12) %>% 
+  summarize(n=n(), revenue = sum(TOTREV), n_commercial=sum(commercialpercent > 50), 
+            concentration=n_commercial/n*100 )
+
+ggplot( dat.commercial.sub, aes(x = concentration)) +  
+        geom_density( alpha = 0.5, fill="blue" ) + 
+        xlim( 0, 100 ) +
+        xlab( "Concentration of Commercial Organizations" )
+
+
+ggplot( dat.commercial.sub, aes( x=concentration ) ) + 
+        geom_density( alpha = 0.5, fill="blue" ) + xlim( 0, 100 ) +
+        xlab( "Concentration of Commercial Organizations" ) + facet_wrap( ~ NTMAJ12, nrow=3 ) + 
+  theme_minimal()
+
+ggplot( dat.commercial.sub, aes( y=concentration ) )  + 
+        geom_boxplot( col="gray30", alpha=0.7) + 
+        ylab( "Concentration of Commercial Organizations" ) +
+        facet_wrap( ~ NTMAJ12, nrow=3 ) + theme_minimal()
+
+
+```
+
+
+
+
+## The Concentration of Commercial Nonprofits and Total Revenue
+
+
+```{r}
+
+
+jplot( log10(dat.commercial.sub$revenue), dat.commercial.sub$concentration, xlab="Total Revenue
+       (logged)", ylab="The Concentration of Commercial Nonprofits", xaxt="n" )
+axis( side=1, at=c(0,1,2,3,4,5,6,7,8,9,10,11),
+      labels=c("1","10","100","1K","10K","100K","1M","10M","100M","1B","10B","100B") )
+
+
+
+
+ggplot( dat.commercial.sub, aes(log10(revenue),concentration) )  + 
+        geom_point( col="gray30", alpha=0.7) +
+        xlab( "Total Revenue (logged)" ) + ylab( "The Concentration of Commercial Nonprofits" ) +
+        theme_minimal()
+
+
+ggplot( dat.commercial.sub, aes(log10(revenue),concentration) )  + 
+        geom_point( col="gray30", alpha=0.7) +
+        xlab( "Total Revenue (logged)" ) + ylab( "The Concentration of Commercial Nonprofits" ) +
+        facet_wrap( ~ NTMAJ12, nrow=3 ) + theme_minimal() + geom_smooth(method='lm')
+
+
+```
+
+
+## The Density of Big Nonprofits and MSA Population
+
+
+```{r}
+
+
+
+```
+
+
+
+# Reference
+
+
+
+
+
+
+
+
+
+
+
+```{css, echo=F}
+p {
+color: black;
+margin: 0 0 20px 0;
+}
+
+td {
+    padding: 3px 10px 3px 10px;
+    text-align: center;
+}
+
+table
+{ 
+    margin-left: auto;
+    margin-right: auto;
+    margin-top:80px;
+    margin-bottom:100px;
+}
+
+h1, h2{
+  margin-top:100px;
+  margin-bottom:20px;
+}
+
+H5{
+    text-align: center;
+    color: gray;
+    font-size:0.8em;
+}
+
+img {
+    max-width: 90%;
+    display: block;
+    margin-right: auto;
+    margin-left: auto;
+    margin-top:30px;
+    margin-bottom:20px;
+}
+
+pre {
+  overflow-x: auto;
+}
+
+pre code {
+   display: block; 
+   padding: 0.5em;
+   margin-bottom:20px;
+}
+
+code {
+  font-size: 92%;
+  border: 10px solid #F8F8F8;
+  margin-bottom: 2px;
+}
+
+code[class] {
+  background-color: #F8F8F8;
+}
+
+```
+

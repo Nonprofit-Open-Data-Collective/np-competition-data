@@ -1,0 +1,10 @@
+base
+haven
+tidyr
+dplyr
+ggplot2
+ggthemes
+scales
+stargazer
+pander
+DT

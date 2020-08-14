@@ -1,0 +1,297 @@
+---
+title: "Markdown Template"
+output:
+  html_document:
+    code_folding: show
+    df_print: paged
+    highlight: haddock
+    theme: cerulean
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=F, warning=F, fig.width = 10)
+```
+
+
+# Load Packages
+
+```{r}
+
+library( haven )
+library( tidyr )
+library( dplyr )
+library( ggplot2 )
+library( ggthemes )
+library( scales )
+library( stargazer )
+library( pander )
+
+```
+
+## Custom Functions
+
+```{r}
+
+jplot <- function( x1, x2, lab1="", lab2="", draw.line=T, ... )
+{
+
+	plot( x1, x2,
+	      pch=19, 
+	      col=gray(0.6, alpha = 0.5), 
+	      cex=1.5,  
+	      bty = "n",
+	      xlab=lab1, 
+	      ylab=lab2, cex.lab=1.5,
+        ... )
+
+	if( draw.line==T ){ 
+		ok <- is.finite(x1) & is.finite(x2)
+		lines( lowess(x2[ok]~x1[ok]), col="red", lwd=3 ) }
+
+}
+
+```
+
+
+
+# Herfindahl-Hirschman Index
+
+## Definitions
+
+Herfindahl-Hirschman Index (HHI) is one of the most popular measures of market structure in nonprofit research and economics. Specifically, it is a measure of market concentration that is used to understand market competitiveness and organizations¡¦ competitive behavior and performance in markets.
+
+## Calculations
+
+HHI can be calculated as follows: 
+
+Approach 1:
+
+The index could be calculated as the sum of the squared market share of each firm competing in a market (Thornton & Belski, 2010). In the nonprofit sector, market share is determined by the ratio of a nonprofit¡¦s total revenue to the aggregate revenue for the organization's market. The calculated values range from 1/N to 1, where N is the number of organizations in a market. A market with an HHI of 1 is considered as a monopoly. In contrast, a market with an HHI close to 0 would be viewed as a nearly competition one.
+
+Approach 2:
+
+Another approach to calculate HHI used the same definition of market share as Approach 1; however, the market share of each organization is expressed as a whole number rather then a decimal in the calculation (Seaman, Wilsker, & Young, 2014; Soule & King, 2008; Thornoton, 2006; Castaneda, Garen, & Thornton, 2008). For example, we take the value of 40 to calculate HHI if a nonprofit¡¦s market share is 0.4 (40%). The calculated values range from 1/N to 10,000. A market with an HHI of 10,000 is considered as a monopoly. In contrast, a market with an HHI close to 0 would be viewed as a nearly competition one. The U.S. Department of Justice suggests that a market with an HHI less than 1,500 to be an unconcentrated marketplace, an HHI of 1,500 to 2,500 to be a moderately concentrated marketplace, and an HHI greater than 2,500 to be a highly concentrated marketplace. There is only scale difference Approach 1 and 2.
+
+Approach 3:
+
+Normalized HHI ranges between 0 to 1, rather than 1/N to 1 or 1/N to 10,000.
+
+## Notes
+
+We define a market as a Metropolitan Statistical Area (MSA) in which relevant nonprofits compete for resources to survive. The code to create HHI metrics is as follows.
+
+
+# Create Metrics
+
+```{r, eval=F}
+
+
+# dat <- read.csv( "https://www.dropbox.com/s/xjad2z6zewwemq9/nccs.core2010pc.csv?dl=1" )
+
+# setwd("C:/Users/JK/Desktop/R Practice")
+
+core.2000 <- readRDS( "nccs.core2010pc.rds" )
+
+names( core.2000 ) <- toupper( names( core.2000 ))
+
+core <- select( core.2000, EIN, MSA_NECH, NTMAJ12, TOTREV)
+
+core %>% group_by( MSA_NECH, NTMAJ12 ) %>% summarize( hhi= sum( (TOTREV / sum(TOTREV))^2 ) )
+
+core %>% group_by( MSA_NECH, NTMAJ12 ) %>% summarize( Nhhi= sum((((TOTREV / sum(TOTREV))^2) - (1 / EIN)) / (1 -(1 / EIN))))
+
+
+## Descriptive Statistics
+
+### Average HHI in MSAs
+
+core %>%
+  group_by(MSA_NECH) %>%
+  summarize( hhi= sum( (TOTREV / sum(TOTREV))^2 ) ) 
+
+
+### Average HHI in Sub-Sectors
+
+core %>%
+  group_by(NTMAJ12) %>%
+  summarize( hhi= sum( (TOTREV / sum(TOTREV))^2 ) )
+
+
+head(core) %>% pander()
+
+```
+
+
+## Descriptive Statistics
+
+```{r}
+
+library( ggplot2 )
+
+
+hhi.msa <- 
+core %>% 
+  group_by( MSA_NECH ) %>% 
+  summarize( hhi= sum( (TOTREV / sum(TOTREV))^2 ) ) 
+                       
+qplot( data=hhi.msa, x=hhi, geom="histogram", xlim=c(0,1) ) 
+
+
+
+
+nhhi <- 
+core %>% group_by( MSA_NECH, NTMAJ12 ) %>% summarize( Nhhi= sum((((TOTREV / sum(TOTREV))^2) - (1 / EIN)) / (1 -(1 / EIN))))
+
+
+qplot( data=nhhi, x=Nhhi, geom="histogram", xlim=c(0,1) ) + facet_wrap( ~ NTMAJ12, ncol=4 )
+
+
+
+
+
+```
+
+
+
+```{r}
+
+
+ggplot( data=nhhi, aes(Nhhi)) + xlim( 0.0, 1.0 ) + geom_histogram()
+
+ggplot( data=nhhi, aes( x=value, fill=Nhhi )) + 
+        geom_density(alpha = 0.5) + xlim( 0.0, 1.0 ) +
+        xlab( "Vital Rates" )  + theme_minimal()
+
+ggplot( nhhi, aes( x=value, fill=Nhhi )) + 
+        geom_density(alpha = 0.5) + xlim( 0.0, 1.0 ) +
+        xlab( "Vital Rates" ) + facet_grid( variable ~ rate  ) + theme_minimal()
+
+```
+
+
+
+## Histograph Example
+
+```{r, eval=F}
+
+ggplot( df.vitals, aes( x=value, fill=rate )) + 
+        geom_density(alpha = 0.5) + xlim( -0.10, 0.25 ) +
+        xlab( "Vital Rates" ) + facet_grid( variable ~ rate  ) + theme_minimal()
+
+
+
+
+new_theme <- function( base_size = 11, base_family = "" ) 
+{
+    theme_bw( base_size = base_size, base_family = base_family) %+replace% 
+             theme(  axis.ticks = element_blank(), legend.background = element_blank(), 
+             legend.key = element_blank(), panel.background = element_blank(),
+             legend.position="none",
+             axis.title.y=element_blank(), axis.text.y=element_blank(), axis.ticks.y=element_blank(),
+             panel.border = element_blank(), strip.background = element_blank(), 
+             plot.background = element_blank(), complete = TRUE )
+}
+
+
+ggplot( df.vitals, aes( x=value, fill=rate )) + 
+        geom_density(alpha = 0.5) + xlim( -0.10, 0.25 ) +
+        xlab( "Vital Rates" ) + 
+        geom_segment( aes(x=0, y=0, xend=0, yend=5 ), color="gray20", lwd=1 ) +
+        facet_grid( variable ~ rate  ) + 
+        ggtitle("Vital Rates Across Metro Areas") + new_theme()
+
+```
+
+
+
+
+
+# Reference
+
+
+
+Seaman, B., A. Wilsker, and D. R. Young. 2014. ¡¥¡¥Measuring Concentration and Competition in the U.S. Nonprofit Sector: Implications for Research and Public Policy.¡¦¡¦ Nonprofit Policy Forum 5(2): 231¡V259.
+
+Thornoton, J. 2006. ¡¥¡¥Nonprofit Fund-Raising in Competitive Donor Markets.¡¦¡¦ Nonprofit and Voluntary Sector Quarterly 35: 204¡V224.
+
+Soule, S. A., & King, B. G. (2008). Competition and resource partitioning in three social movement industries. American Journal of Sociology, 113(6), 1568-1610.
+
+Castaneda, M. A., Garen, J., & Thornton, J. (2007). Competition, contractibility, and the market for donors to nonprofits. The Journal of Law, Economics, & Organization, 24(1), 215-246.
+
+Thornton, J. P., & Belski, W. H. (2010). Financial reporting quality and price competition among nonprofit firms. Applied economics, 42(21), 2699-2713.
+
+
+
+
+
+
+
+```{css, echo=F}
+p {
+color: black;
+margin: 0 0 20px 0;
+}
+
+td {
+    padding: 3px 10px 3px 10px;
+    text-align: center;
+}
+
+table
+{ 
+    margin-left: auto;
+    margin-right: auto;
+    margin-top:80px;
+    margin-bottom:100px;
+}
+
+h1, h2{
+  margin-top:100px;
+  margin-bottom:20px;
+}
+
+H5{
+    text-align: center;
+    color: gray;
+    font-size:0.8em;
+}
+
+img {
+    max-width: 90%;
+    display: block;
+    margin-right: auto;
+    margin-left: auto;
+    margin-top:30px;
+    margin-bottom:20px;
+}
+
+pre {
+  overflow-x: auto;
+}
+
+pre code {
+   display: block; 
+   padding: 0.5em;
+   margin-bottom:20px;
+}
+
+code {
+  font-size: 92%;
+  border: 10px solid #F8F8F8;
+  margin-bottom: 2px;
+}
+
+code[class] {
+  background-color: #F8F8F8;
+}
+
+```
+

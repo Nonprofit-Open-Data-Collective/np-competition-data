@@ -1,0 +1,37 @@
+---
+title: "Data Sources"
+output:
+  html_document:
+    code_folding: show
+    df_print: paged
+    highlight: haddock
+    theme: cerulean
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## MSA Definitions
+
+NBER Crosswalk files: https://www.nber.org/data/cbsa-msa-fips-ssa-county-crosswalk.html
+
+CBSAtoCountycrosswalk_FY15_FR.xlsx
+
+
+
+## Nonprofit Datasets
+
+
+## Population Datasets
+
+
+
+## Census Data

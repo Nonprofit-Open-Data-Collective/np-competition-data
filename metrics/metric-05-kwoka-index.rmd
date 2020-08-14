@@ -1,0 +1,409 @@
+---
+title: "Markdown Template"
+output:
+  html_document:
+    code_folding: show
+    df_print: paged
+    highlight: haddock
+    theme: cerulean
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=F, warning=F, fig.width = 10)
+```
+
+
+# Load Packages
+
+```{r}
+
+library( haven )
+library( tidyr )
+library( dplyr )
+library( ggplot2 )
+library( ggthemes )
+library( scales )
+library( stargazer )
+library( pander )
+
+
+```
+
+## Custom Functions
+
+```{r}
+
+jplot <- function( x1, x2, draw.line=T, ... )
+{
+
+	plot( x1, x2,
+	      pch=19, 
+	      col=gray(0.6, alpha = 0.4), 
+	      cex=0.8,  
+	      bty = "n",
+	      cex.lab=1.5,
+        ... )
+
+	if( draw.line==T ){ 
+		ok <- is.finite(x1) & is.finite(x2)
+		lines( lowess(x2[ok]~x1[ok]), col="red", lwd=3 ) }
+
+}
+
+```
+
+
+
+# Kwoka Index
+
+
+
+## Definitions
+
+
+
+## Calculations
+
+HHI can be calculated as follows: 
+
+Approach 1:
+
+
+
+Approach 2:
+
+
+
+Approach 3:
+
+
+
+## Notes
+
+We define a market as a Metropolitan Statistical Area (MSA) in which relevant nonprofits compete for resources to survive. The code to create HHI metrics is as follows.
+
+
+# Create Metrics
+
+```{r, eval=F}
+
+
+
+setwd("C:/Users/JK/Desktop/R Practice")
+
+core.2010 <- readRDS( "nccs.core2010pc.rds" )
+
+names( core.2010 ) <- toupper( names( core.2010 ))
+
+core <- select( core.2010, EIN, MSA_NECH, NTMAJ12, TOTREV, CONT)
+
+core$NTMAJ12[ core$NTMAJ12 == "AR" ] <- "Arts"
+core$NTMAJ12[ core$NTMAJ12 == "BH" ] <- "Universities"
+core$NTMAJ12[ core$NTMAJ12 == "ED" ] <- "Education"
+core$NTMAJ12[ core$NTMAJ12 == "EH" ] <- "Hospitals"
+core$NTMAJ12[ core$NTMAJ12 == "EN" ] <- "Environmental"
+core$NTMAJ12[ core$NTMAJ12 == "HE" ] <- "Health"
+core$NTMAJ12[ core$NTMAJ12 == "HU" ] <- "Human Services"
+core$NTMAJ12[ core$NTMAJ12 == "IN" ] <- "International"
+core$NTMAJ12[ core$NTMAJ12 == "MU" ] <- "Mutual Benefit"
+core$NTMAJ12[ core$NTMAJ12 == "PU" ] <- "Public Benefit"
+core$NTMAJ12[ core$NTMAJ12 == "RE" ] <- "Religion"
+core$NTMAJ12[ core$NTMAJ12 == "UN" ] <- "Unknown"
+
+head(core) %>% pander()
+             
+
+core$NTMAJ12 <- factor( core$NTMAJ12 )
+
+dat.kindex3 <- 
+  core %>% 
+  group_by( MSA_NECH) %>%
+  mutate(rank = rank(desc(TOTREV))) %>%
+  arrange(rank) %>%
+  summarize( n=n(), top1 = sum(nth(TOTREV, 1)), top2 = sum(nth(TOTREV, 2)), 
+             top3 = sum(nth(TOTREV, 3)),total = top1 + top2 + top3, Kindex3 = (((top1/total)^2 +
+                                                                                 (top2/total)^2+
+                                                                               (top3/total)^2)))
+View(dat.kindex3)
+
+
+
+dat.kindex2 <- 
+  core %>% 
+  group_by( MSA_NECH) %>%
+  mutate(rank = rank(desc(TOTREV))) %>%
+  arrange(rank) %>%
+  summarize( n=n(), top1 = sum(nth(TOTREV, 1)), top2 = sum(nth(TOTREV, 2)), total = top1 + top2, 
+             Kindex2 = (((top1/total)^2 + (top2/total)^2)))
+
+
+
+
+dat.kindex3.sub <- 
+  core %>% 
+  group_by( MSA_NECH, NTMAJ12) %>%
+  mutate(rank = rank(desc(TOTREV))) %>%
+  arrange(rank) %>%
+  summarize( n=n(), revenue = sum(TOTREV), top1 = sum(nth(TOTREV, 1)), top2 = sum(nth(TOTREV, 2)), 
+             top3 = sum(nth(TOTREV, 3)),total = top1 + top2 + top3, Kindex3 = (((top1/total)^2 +
+                                                                                 (top2/total)^2+
+                                                                               (top3/total)^2)))
+
+View(dat.kindex3.sub)
+
+
+dat.kindex3.sub$revenue[ dat.kindex3.sub$revenue < 0 ] <- 0
+
+summary(dat.kindex3.sub$Kindex3)
+summary(core$TOTREV)
+
+
+
+
+```
+
+# Descriptive Statistics
+
+## Kwoka Index (3) by MSAs
+
+```{r}
+
+dat.kindex3 <- 
+  core %>% 
+  group_by( MSA_NECH) %>%
+  mutate(rank = rank(desc(TOTREV))) %>%
+  arrange(rank) %>%
+  summarize( n=n(), top1 = sum(nth(TOTREV, 1)), top2 = sum(nth(TOTREV, 2)), 
+             top3 = sum(nth(TOTREV, 3)),total = top1 + top2 + top3, KwokaIndex = (((top1/total)^2 +
+                                                                                 (top2/total)^2+
+                                                                               (top3/total)^2)))
+
+
+
+
+ggplot( dat.kindex3, aes(x = KwokaIndex )) +  geom_density( alpha = 0.5, fill="blue" ) + xlim( 0, 1 ) 
+
+
+
+```
+
+## HHI by Subsector
+
+```{r}
+
+dat.kindex3.sub <- 
+  core %>% 
+  group_by(NTMAJ12) %>%
+  mutate(rank = rank(desc(TOTREV))) %>%
+  arrange(rank) %>%
+  summarize( n=n(), top1 = sum(nth(TOTREV, 1)), top2 = sum(nth(TOTREV, 2)), 
+             top3 = sum(nth(TOTREV, 3)),total = top1 + top2 + top3, KwokaIndex = (((top1/total)^2 +
+                                                                                 (top2/total)^2+
+                                                                               (top3/total)^2)))
+
+
+dat.kindex3.sub <- 
+  core %>% 
+  group_by( MSA_NECH, NTMAJ12) %>%
+  mutate(rank = rank(desc(TOTREV))) %>%
+  arrange(rank) %>%
+  summarize( n=n(), revenue = sum(TOTREV), contribution = sum(CONT), top1 = sum(nth(TOTREV, 1)), top2 =
+               sum(nth(TOTREV, 2)), top3 = sum(nth(TOTREV, 3)),total = top1 + top2 + top3, KwokaIndex =
+               (((top1/total)^2 + (top2/total)^2+ (top3/total)^2)))
+
+ggplot( dat.kindex3.sub, aes(x = KwokaIndex)) +  geom_density( alpha = 0.5, fill="blue" ) + xlim( 
+  -0.05, 1 ) + xlab( "Kwoka Index" )
+
+
+ggplot( dat.kindex3.sub, aes( x=KwokaIndex ) ) + 
+        geom_density( alpha = 0.5, fill="blue" ) + xlim( -0.05, 1 ) +
+        xlab( "Kwoka Index" ) + facet_wrap( ~ NTMAJ12, nrow=3 ) + theme_minimal()
+
+ggplot( dat.kindex3.sub, aes(y = KwokaIndex) )  + 
+        geom_boxplot( col="gray30", alpha=0.7) + 
+        ylab( "Kwoka Index Across MSAs" ) +
+        facet_wrap( ~ NTMAJ12, nrow=3 ) + theme_minimal()
+
+
+```
+
+
+
+## Kwoka Index and Subsector Size
+
+```{r}
+
+
+jplot( log10(dat.kindex3.sub$n), dat.kindex3.sub$KwokaIndex, xlab="Number of Nonprofits", ylab="Kwoka Index", xaxt="n") 
+axis( side=1, at=c(0,1,2,3,4), labels=c("1","10","100","1,000","10,000") )
+
+
+
+ggplot( dat.kindex3.sub, aes(log10(n),KwokaIndex) )  + 
+        geom_point( col="gray30", alpha=0.7) + 
+        xlab( "Number of Nonprofits (logged)" ) + ylab( "Kwoka Index Across MSAs" ) +
+        theme_minimal()
+
+
+ggplot( dat.kindex3.sub, aes(log10(n),KwokaIndex) )  + 
+        geom_point( col="gray30", alpha=0.7) + 
+        xlab( "Number of Nonprofits (logged)" ) + ylab( "Kwoka Index Across MSAs" ) +
+        facet_wrap( ~ NTMAJ12, nrow=3 ) + theme_minimal()
+
+
+
+
+
+```
+
+## Kwoka Index and Total Revenue
+
+
+```{r}
+
+
+jplot( log10(dat.kindex3.sub$revenue), dat.kindex3.sub$KwokaIndex, xlab="Total Revenue (logged)", 
+       ylab="Kwoka Index", xaxt="n" )
+axis( side=1, at=c(0,1,2,3,4,5,6,7,8,9,10,11),
+      labels=c("1","10","100","1K","10K","100K","1M","10M","100M","1B","10B","100B") )
+
+
+
+
+ggplot( dat.kindex3.sub, aes(log10(revenue),KwokaIndex) )  + 
+        geom_point( col="gray30", alpha=0.7) +
+        xlab( "Total Revenue (logged)" ) + ylab( "Kwoka Index Across MSAs" ) +
+        theme_minimal()
+
+
+ggplot( dat.kindex3.sub, aes(log10(revenue),KwokaIndex) )  + 
+        geom_point( col="gray30", alpha=0.7) +
+        xlab( "Total Revenue (logged)" ) + ylab( "Kwoka Index Across MSAs" ) +
+        facet_wrap( ~ NTMAJ12, nrow=3 ) + theme_minimal()
+
+
+
+ggplot( dat.kindex3.sub, aes(log10(revenue),KwokaIndex) )  + 
+        geom_point( col="gray30", alpha=0.7) +
+        geom_smooth(method="lm") +
+        xlab( "Total Revenue (logged)" ) + ylab( "Kwoka Index Across MSAs" ) +
+        facet_wrap( ~ NTMAJ12, nrow=3 ) + theme_minimal()
+
+```
+
+
+## Kwoka Index and Subsector Contribution
+
+
+```{r}
+
+jplot( log10(dat.kindex3.sub$contribution), dat.kindex3.sub$KwokaIndex, xlab="Contribution (logged)", 
+       ylab="Kwoka Index", xaxt="n" )
+axis( side=1, at=c(0,1,2,3,4,5,6,7,8,9,10,11), 
+      labels=c("1","10","100","1K","10K","100K","1M","10M","100M","1B","10B","100B") )
+
+
+ggplot( dat.kindex3.sub, aes(log10(contribution),KwokaIndex) )  + 
+        geom_point( col="gray30", alpha=0.7) +
+        xlab( "Contrubution (logged)" ) + ylab( "Kwoka Index Across MSAs" ) +
+        theme_minimal()
+
+
+ggplot( dat.kindex3.sub, aes(log10(contribution),KwokaIndex) )  + 
+        geom_point( col="gray30", alpha=0.7) +
+        xlab( "Contrubution (logged)" ) + ylab( "Kwoka Index Across MSAs" ) +
+        facet_wrap( ~ NTMAJ12, nrow=3 ) + theme_minimal()
+
+
+ggplot( dat.kindex3.sub, aes(log10(contribution),KwokaIndex) )  + 
+        geom_point( col="gray30", alpha=0.7) +
+        geom_smooth(method="lm") +
+        xlab( "Contrubution (logged)" ) + ylab( "Kwoka Index Across MSAs" ) +
+        facet_wrap( ~ NTMAJ12, nrow=3 ) + theme_minimal()
+```
+
+
+
+# Reference
+
+
+
+Seaman, B., A. Wilsker, and D. R. Young. 2014. ¡¥¡¥Measuring Concentration and Competition in the U.S. Nonprofit Sector: Implications for Research and Public Policy.¡¦¡¦ Nonprofit Policy Forum 5(2): 231¡V259.
+
+
+
+
+
+
+
+
+
+```{css, echo=F}
+p {
+color: black;
+margin: 0 0 20px 0;
+}
+
+td {
+    padding: 3px 10px 3px 10px;
+    text-align: center;
+}
+
+table
+{ 
+    margin-left: auto;
+    margin-right: auto;
+    margin-top:80px;
+    margin-bottom:100px;
+}
+
+h1, h2{
+  margin-top:100px;
+  margin-bottom:20px;
+}
+
+H5{
+    text-align: center;
+    color: gray;
+    font-size:0.8em;
+}
+
+img {
+    max-width: 90%;
+    display: block;
+    margin-right: auto;
+    margin-left: auto;
+    margin-top:30px;
+    margin-bottom:20px;
+}
+
+pre {
+  overflow-x: auto;
+}
+
+pre code {
+   display: block; 
+   padding: 0.5em;
+   margin-bottom:20px;
+}
+
+code {
+  font-size: 92%;
+  border: 10px solid #F8F8F8;
+  margin-bottom: 2px;
+}
+
+code[class] {
+  background-color: #F8F8F8;
+}
+
+```
+

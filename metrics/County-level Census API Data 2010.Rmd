@@ -1,0 +1,255 @@
+---
+title: "Markdown Template"
+output:
+  html_document:
+    code_folding: show
+    df_print: paged
+    highlight: haddock
+    theme: cerulean
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    toc: yes
+  word_document:
+    toc: yes
+---
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=F, warning=F, fig.width = 10)
+```
+
+
+# Load Packages
+
+```{r}
+
+library( haven )
+library( tidyr )
+library( dplyr )
+library( ggplot2 )
+library( ggthemes )
+library( scales )
+library( stargazer )
+library( pander )
+library( censusapi )
+
+
+```
+
+## Custom Functions
+
+```{r}
+
+jplot <- function( x1, x2, draw.line=T, ... )
+{
+
+	plot( x1, x2,
+	      pch=19, 
+	      col=gray(0.6, alpha = 0.4), 
+	      cex=0.8,  
+	      bty = "n",
+	      cex.lab=1.5,
+        ... )
+
+	if( draw.line==T ){ 
+		ok <- is.finite(x1) & is.finite(x2)
+		lines( lowess(x2[ok]~x1[ok]), col="red", lwd=3 ) }
+
+}
+
+```
+
+
+
+# H
+
+
+
+## Definitions
+
+
+
+## Calculations
+
+can be calculated as follows: 
+
+Approach 1:
+
+
+Approach 2:
+
+
+
+Approach 3:
+
+
+
+## Notes
+
+We define a market as a Metropolitan Statistical Area (MSA) in which relevant nonprofits compete for resources to survive. The code to create HHI metrics is as follows.
+
+
+# API Census Data
+
+```{r, eval=F}
+
+
+# devtools::install_github("hrecht/censusapi")
+
+censuskey <- "378079ddfd58f4b93006bb559f6eeda4d1bb15dc"
+
+acs5_2010 <- getCensus( name="acs5", 
+                        vintage=2010, 
+                        key="378079ddfd58f4b93006bb559f6eeda4d1bb15dc", 
+                        vars=c("B01001_001E","B19013_001E","B19301_001E",
+                               "B01001A_001E","B01001B_001E",
+                               "B01001D_001E", "B01001I_001E", "B01001_002E", 
+                               "B01001_026E","B01002A_001E" ),
+                               # ,"B23025_002E", 
+                               #"B23025_004E","B23025_005E","B17010_017E","B17001_002E",
+                               #"B09001_001E","B99211_002E" ), 
+                        region="county:*")
+
+head( acs5_2010 )
+
+
+acs5_2010 <- acs5_2010 %>% 
+          rename(Total Population = B01001_001E,  )
+
+
+
+
+```
+
+# Descriptive Statistics
+
+## by MSAs
+
+```{r}
+
+
+
+
+
+```
+
+##  by Subsector
+
+```{r}
+
+
+
+
+```
+
+
+
+## and Subsector Size
+
+```{r}
+
+
+
+
+
+
+
+
+```
+
+## and Total Revenue
+
+
+```{r}
+
+
+
+
+```
+
+
+## HHI and Subsector Contribution
+
+
+```{r}
+
+
+```
+
+
+
+# Reference
+
+
+
+
+
+
+
+
+
+
+
+```{css, echo=F}
+p {
+color: black;
+margin: 0 0 20px 0;
+}
+
+td {
+    padding: 3px 10px 3px 10px;
+    text-align: center;
+}
+
+table
+{ 
+    margin-left: auto;
+    margin-right: auto;
+    margin-top:80px;
+    margin-bottom:100px;
+}
+
+h1, h2{
+  margin-top:100px;
+  margin-bottom:20px;
+}
+
+H5{
+    text-align: center;
+    color: gray;
+    font-size:0.8em;
+}
+
+img {
+    max-width: 90%;
+    display: block;
+    margin-right: auto;
+    margin-left: auto;
+    margin-top:30px;
+    margin-bottom:20px;
+}
+
+pre {
+  overflow-x: auto;
+}
+
+pre code {
+   display: block; 
+   padding: 0.5em;
+   margin-bottom:20px;
+}
+
+code {
+  font-size: 92%;
+  border: 10px solid #F8F8F8;
+  margin-bottom: 2px;
+}
+
+code[class] {
+  background-color: #F8F8F8;
+}
+
+```
+
